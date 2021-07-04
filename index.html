@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <!-- Latest compiled and minified CSS -->
+    <link
+      rel="stylesheet"
+      href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"
+      integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u"
+      crossorigin="anonymous"
+    />
+
+    <!-- Optional theme -->
+    <link
+      rel="stylesheet"
+      href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap-theme.min.css"
+      integrity="sha384-rHyoN1iRsVXV4nD0JutlnGaslCJuC7uwjduW9SVrLvRYooPp2bWYgmgJQIXwl/Sp"
+      crossorigin="anonymous"
+    />
+
+    <!-- Latest compiled and minified JavaScript -->
+
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, minimum-scale=1.0"
+    />
+    <title>Spring Boot WebSocket Chat Application</title>
+  </head>
+  <body>
+    <noscript
+      ><h2 style="color: #ff0000">
+        Seems your browser doesn't support Javascript! Websocket relies on
+        Javascript being enabled. Please enable Javascript and reload this page!
+      </h2></noscript
+    >
+    <div id="main-content" class="container">
+      <div class="row">
+        <div class="col-md-6">
+          <form class="form-inline">
+            <div class="form-group">
+              <label for="connect">WebSocket connection:</label>
+              <button id="connect" class="btn btn-default" type="submit">
+                Connect
+              </button>
+              <button
+                id="disconnect"
+                class="btn btn-default"
+                type="submit"
+                disabled="disabled"
+              >
+                Disconnect
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-md-12">
+          <table id="conversation" class="table table-striped">
+            <thead>
+              <tr>
+                <th>Issue List</th>
+              </tr>
+            </thead>
+            <tbody id="issue-list"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <script
+      src="https://code.jquery.com/jquery-3.6.0.min.js"
+      integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4="
+      crossorigin="anonymous"
+    ></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.1.4/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <script
+      src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"
+      integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa"
+      crossorigin="anonymous"
+    ></script>
+
+    <script>
+      var stompClient = null;
+
+      function setConnected(connected) {
+        $("#connect").prop("disabled", connected);
+        $("#disconnect").prop("disabled", !connected);
+        if (connected) {
+          $("#conversation").show();
+        } else {
+          $("#conversation").hide();
+        }
+        $("#issue-list").html("");
+      }
+
+      function connect() {
+        const token =
+          "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI3ZmIwYjdiNi0xZjMwLTRlOTYtYTMwMS1iMTI5NWYwNjI4ZWEiLCJhdWQiOlsib2F1dGgyLXJlc291cmNlIl0sInVzZXJfbmFtZSI6IjdmYjBiN2I2LTFmMzAtNGU5Ni1hMzAxLWIxMjk1ZjA2MjhlYSIsInNjb3BlIjpbInJlYWQiXSwiZXhwIjoxNjM4MzQ3NTU1LCJpYXQiOjE2MjUzODc1NTUsImp0aSI6IjBkODg5NWVhLTk5YTUtNGQ2OS04OTBlLWJmMzUyMGZlNTBmZSIsImNsaWVudF9pZCI6ImYxMzU0OTg2LWU2OTgtNDcxMi1iYTk0LWU5NGIxMGJmMWI1OCJ9.OmmQ6pG7G_awtvsE-QTwpG_YjlXkXwXK7i-JsLeohcMhVP7TNRhNyDp_D_NOMScQPOgog3FdyjJy8gk0gAI0X1tnFCceOjOfbSZQ8R_TxHPSiPVVIx4LEHeYTveJRtaT0jQ7lGKk8w4Jrhqnsj9C2r6Vxks1D8nz22i7HArK6WyIBHGwLJ7mWWsd03xfyXAcyqTXRKYOmesobH8W82bIIw9c3Gc4M0a5Nly5PtDwQ7ZKeE2Lkhg7mIxvk2BPq5NeEFpfOelYCMHjNRXUo_C4424fJjy0Euq2SMrJo3Ylmd-AVuxqCNm8b3bLQwhWNHp4dc9bCLYmUfX6kaeTXhB1tQ";
+        var socket = new SockJS(
+          "http://localhost:8081/tnp/notification/api/v0/websocket?token=" +
+            token
+        );
+
+        stompClient = Stomp.over(socket);
+        const headers = {};
+        headers["Access-Control-Allow-Credentials"] = true;
+
+        stompClient.connect(headers, function (frame) {
+          setConnected(true);
+          console.log("Connected: " + frame);
+          stompClient.subscribe("/topic/notification", function (response) {
+            console.log(response);
+            const issue = JSON.parse(response.body);
+            showIssue(issue);
+          });
+        });
+      }
+
+      function disconnect() {
+        if (stompClient !== null) {
+          stompClient.disconnect();
+        }
+        setConnected(false);
+        console.log("Disconnected");
+      }
+
+      function showIssue(issue) {
+        $("#issue-list").append(`<tr>
+                <td>${issue}</td>
+            </tr>`);
+        //   $("#issue-list").append("<tr><td>" + id + " - " + title + " - " + content + " - " + data + " - " + eventType + " - " + eventSubType + " - " + effectType + "</td></tr>");
+      }
+
+      $(function () {
+        $("form").on("submit", function (e) {
+          e.preventDefault();
+        });
+        $("#connect").click(function () {
+          connect();
+        });
+        $("#disconnect").click(function () {
+          disconnect();
+        });
+      });
+    </script>
+  </body>
+</html>
